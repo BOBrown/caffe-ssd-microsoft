@@ -24,10 +24,10 @@ Requriements: CUDA8.0 and cudnn v5.x or  cudnn v6.x (NOTE: inappropriate cudnn v
   cd caffe-ssd-microsoft/windows<br>
   cp CommonSettings.props.example CommonSettings.props<br>
   Enter file named CommonSettings.props, change following items<br>
-    \<CudaVersion>8.0\</CudaVersion>  //here is your CUDA version<br>
-	\<UseCuDNN>true\</UseCuDNN>       // true stands for using cudnn lib<br>
-	\<PythonSupport>true\</PythonSupport> // if you choose to support python, you must change <PythonDir> item with your python dir in your Windows<br>
-	\<PythonDir>C:\Python27\</PythonDir> <br>
+    \<CudaVersion\>8.0\<\/CudaVersion\>  //here is your CUDA version<br>
+	<UseCuDNN>true</UseCuDNN>       // true stands for using cudnn lib<br>
+	<PythonSupport>true</PythonSupport> // if you choose to support python, you must change <PythonDir> item with your python dir in your Windows<br>
+	<PythonDir>C:Python27\</PythonDir> <br>
   3. Compiling libcaffe:<br>
   NuGet will be loaded automatically when you compile libcaffe project.<br>
   some compile errors could be due to the inappropriate OpenCv version and glog version.<br>
