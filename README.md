@@ -30,8 +30,8 @@ Requriements: CUDA8.0 and cudnn v5.x or  cudnn v6.x (NOTE: inappropriate cudnn v
 	\<PythonDir\>C:Python27\<\/PythonDir\> <br>
   3. Compiling libcaffe:<br>
   NuGet will be loaded automatically when you compile libcaffe project.<br>
-  some compile errors could be due to the inappropriate OpenCv version and glog version.<br>
-  trying update the corresponding NuGet package.<br>
+  Some compile errors could take place due to the inappropriate OpenCv version and glog version.<br>
+  Trying update the corresponding NuGet package.<br>
   4. ssd_detect.cpp:<br>
   ssd_detect.cpp is a demo of using SSD lib. It will detect a binary images and store the detecton result in a txt file.<br>
   see detect.cpp for more details.<br>
