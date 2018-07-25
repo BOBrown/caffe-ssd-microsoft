@@ -34,8 +34,6 @@
 #ifdef USE_OPENCV
 using namespace caffe;  // NOLINT(build/namespaces)
 
-int HEIGHT = 380;
-
 #define WIDTH 190
 #define VECTOR_TXT 6 //¶ÁÈ¡µÄtxtµÄ¸ñÊ½³¤¶È
 #define REFLECTION_WIDTH 380 //Ó³ÉäÍ¼ÏñµÄ¿í¶È
@@ -46,8 +44,16 @@ class Detector {
   Detector();
 
   std::vector<vector<float> > Detect(const cv::Mat& img);
-  void init(const string& model_file, const string& weights_file, const string& mean_file, const string& mean_value, int gpu_id);
- private:
+  void init(const string& model_file, const string& weights_file, const int height, const string& mean_file, const string& mean_value, int gpu_id);
+  void set_height(int height)
+  {
+	  height_ = height;
+  }
+  int get_height()
+  {
+	  return height_;
+  }
+private:
   void SetMean(const string& mean_file, const string& mean_value);
 
   void WrapInputLayer(std::vector<cv::Mat>* input_channels);
@@ -60,6 +66,7 @@ class Detector {
   cv::Size input_geometry_;
   int num_channels_;
   cv::Mat mean_;
+  int height_;
 };
 
 Detector::Detector()
@@ -67,14 +74,15 @@ Detector::Detector()
 
 void Detector::init(const string& model_file,
                    const string& weights_file,
+				   const int height,
                    const string& mean_file,
                    const string& mean_value,
 				   int gpu_id) {
 
-
+  
   Caffe::set_mode(Caffe::GPU);
   Caffe::SetDevice(gpu_id);
-  
+  set_height(height);
   /* Load the network. */
   net_.reset(new Net<float>(model_file, TEST));
   net_->CopyTrainedLayersFrom(weights_file);
@@ -299,13 +307,13 @@ int calcIOU(int one_x, int one_y, int one_w, int one_h, int two_x, int two_y, in
 	return calcIOU;
 }
 
-int txt_to_image(const char *txt_file_name, cv::Mat image, bool rotate)
+int txt_to_image(const char *txt_file_name, cv::Mat image, bool rotate, int Height)
 {
 	FILE *f = NULL;
 	f = fopen(txt_file_name, "rb");
 
 	unsigned char *data_ptr = NULL;
-	data_ptr = new unsigned char[WIDTH *HEIGHT];
+	data_ptr = new unsigned char[WIDTH *Height];//0¡ª255 Ò»¸ö×Ö½Ú
 
 	if (f == NULL)
 	{
@@ -319,9 +327,9 @@ int txt_to_image(const char *txt_file_name, cv::Mat image, bool rotate)
 		return -2;
 	}
 	uchar *ip = image.data;
-	fread(data_ptr, sizeof(unsigned char), HEIGHT *WIDTH, f);
+	fread(data_ptr, sizeof(unsigned char), Height *WIDTH, f);
 	if (!rotate){
-		for (int i = 0; i < HEIGHT*WIDTH; i++)
+		for (int i = 0; i < Height*WIDTH; i++)
 		{
 			ip[3 * i] = data_ptr[i];
 			ip[3 * i + 1] = data_ptr[i];
@@ -330,11 +338,11 @@ int txt_to_image(const char *txt_file_name, cv::Mat image, bool rotate)
 	}
 	else
 	{
-		for (int i = 0; i < HEIGHT*WIDTH; i++)
+		for (int i = 0; i < Height*WIDTH; i++)
 		{
-			ip[3 * i] = data_ptr[HEIGHT*WIDTH - i + 2 * (i % WIDTH) - WIDTH];
-			ip[3 * i + 1] = data_ptr[HEIGHT*WIDTH - i + 2 * (i % WIDTH) - WIDTH];
-			ip[3 * i + 2] = data_ptr[HEIGHT*WIDTH - i + 2 * (i % WIDTH) - WIDTH];
+			ip[3 * i] = data_ptr[Height*WIDTH - i + 2 * (i % WIDTH) - WIDTH];
+			ip[3 * i + 1] = data_ptr[Height*WIDTH - i + 2 * (i % WIDTH) - WIDTH];
+			ip[3 * i + 2] = data_ptr[Height*WIDTH - i + 2 * (i % WIDTH) - WIDTH];
 		}
 	}
 	fclose(f);
@@ -346,7 +354,7 @@ int txt_to_image(const char *txt_file_name, cv::Mat image, bool rotate)
 
 
 /*you may change the class Detection to the type of SSD*/
-int write_to_txt(const char *output_path, std::vector<vector<float> > detections, int pro_flag, float thre)
+int write_to_txt(const char *output_path, std::vector<vector<float> > detections, int pro_flag, float thre, int HEIGHT)
 {
 	std::streambuf* buf = std::cout.rdbuf();
 	std::ostream out(buf);
@@ -367,8 +375,8 @@ int write_to_txt(const char *output_path, std::vector<vector<float> > detections
 		const float score = d[2];
 		if (score >= thre)
 		{
-			float w = float(d[5] * WIDTH) - float(d[3] * WIDTH);
-			float h = float(d[6] * HEIGHT) - float(d[4] * HEIGHT);
+			int w = float(d[5] * WIDTH) - float(d[3] * WIDTH);
+			int h = float(d[6] * HEIGHT) - float(d[4] * HEIGHT);
 			out << static_cast<int>(d[1]) << " ";
 			out << score << " ";
 			out << static_cast<int>(d[3] * WIDTH) << " ";
@@ -376,7 +384,7 @@ int write_to_txt(const char *output_path, std::vector<vector<float> > detections
 			out << w << " ";
 			out << h << std::endl;
 			
-			fprintf(f, "%f %f %f %f %f %d\n", float(d[3] * WIDTH), float(d[4] * HEIGHT), w, h, score, int(d[1]));
+			fprintf(f, "%d %d %d %d %f %d\n", int(d[3] * WIDTH), int(d[4] * HEIGHT), w, h, score, int(d[1]));
 		}
 		
 	}
@@ -394,28 +402,28 @@ __declspec(dllexport) void global_init()
 
 __declspec(dllexport) void detect_init_front(const char *network_pt, const char *caffemodel, int GPUID, int h, int max_in, int min_in, float thresh)
 {
-	detector_front.init(network_pt, caffemodel, FLAGS_mean_file, FLAGS_mean_value, GPUID);
+	detector_front.init(network_pt, caffemodel, h, FLAGS_mean_file, FLAGS_mean_value, GPUID);
 	confidence_threshold_front = thresh;
 	printf(" detector.init() for front -> done.\n");
 }
 
 __declspec(dllexport) void detect_init_front_refl(const char *network_pt, const char *caffemodel, int GPUID, int h, int max_in, int min_in, float thresh)
 {
-	detector_front_refl.init(network_pt, caffemodel, FLAGS_mean_file, FLAGS_mean_value, GPUID);
+	detector_front_refl.init(network_pt, caffemodel, h, FLAGS_mean_file, FLAGS_mean_value, GPUID);
 	confidence_threshold_front_refl = thresh;
 	printf(" detector.init() for refletion front -> done.\n");
 }
 
 __declspec(dllexport) void detect_init_back(const char *network_pt, const char *caffemodel, int GPUID, int h, int max_in, int min_in, float thresh)
 {
-	detector_back.init(network_pt, caffemodel, FLAGS_mean_file, FLAGS_mean_value, GPUID);
+	detector_back.init(network_pt, caffemodel, h, FLAGS_mean_file, FLAGS_mean_value, GPUID);
 	confidence_threshold_back = thresh;
 	printf(" detector.init() for back -> done.\n");
 }
 
 __declspec(dllexport) void detect_init_back_refl(const char *network_pt, const char *caffemodel, int GPUID, int h, int max_in, int min_in, float thresh)
 {
-	detector_back_refl.init(network_pt, caffemodel, FLAGS_mean_file, FLAGS_mean_value, GPUID);
+	detector_back_refl.init(network_pt, caffemodel, h, FLAGS_mean_file, FLAGS_mean_value, GPUID);
 	confidence_threshold_front_refl = thresh;
 	printf(" detector.init() for refletion back -> done.\n");
 }
@@ -423,16 +431,18 @@ __declspec(dllexport) void detect_init_back_refl(const char *network_pt, const c
 __declspec(dllexport) int detect_txt_front(const char *input_txt, bool rotate, const char *output_txt, bool vis)
 {
 	int pro_flag = 0;
+	int HEIGHT = detector_front.get_height();
 
 	std::streambuf* buf = std::cout.rdbuf();
 	std::ostream out(buf);
 	cv::Mat img(HEIGHT, WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
 	int returnvalue = 0;
-	returnvalue = txt_to_image(input_txt, img, rotate);
+	returnvalue = txt_to_image(input_txt, img, rotate, HEIGHT);
 	if (returnvalue < 0)
 		return returnvalue;
 	CHECK(!img.empty()) << "Unable to decode image " << input_txt;
 	//cv::imshow("Result", img);
+	//cv::imwrite("D:\\test_390.png", img);
 	//cv::waitKey(0);
 
 	
@@ -449,7 +459,7 @@ __declspec(dllexport) int detect_txt_front(const char *input_txt, bool rotate, c
 		}
 	}
 	//changed by holobo
-	write_to_txt(output_txt, detections, pro_flag, confidence_threshold_front);
+	write_to_txt(output_txt, detections, pro_flag, confidence_threshold_front, HEIGHT);
 	printf("-->detect done!\n");
 	if (returnvalue < 0)
 		return returnvalue;
@@ -460,12 +470,12 @@ __declspec(dllexport) int detect_txt_front(const char *input_txt, bool rotate, c
 __declspec(dllexport) int detect_txt_back(const char *input_txt, bool rotate, const char *output_txt, bool vis)
 {
 	int pro_flag = 0;
-
+	int HEIGHT = detector_back.get_height();
 	std::streambuf* buf = std::cout.rdbuf();
 	std::ostream out(buf);
 	cv::Mat img(HEIGHT, WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
 	int returnvalue = 0;
-	returnvalue = txt_to_image(input_txt, img, rotate);
+	returnvalue = txt_to_image(input_txt, img, rotate, HEIGHT);
 	if (returnvalue < 0)
 		return returnvalue;
 	CHECK(!img.empty()) << "Unable to decode image " << input_txt;
@@ -483,7 +493,7 @@ __declspec(dllexport) int detect_txt_back(const char *input_txt, bool rotate, co
 		}
 	}
 	//changed by holobo
-	write_to_txt(output_txt, detections, pro_flag, confidence_threshold_back);
+	write_to_txt(output_txt, detections, pro_flag, confidence_threshold_back, HEIGHT);
 	printf("-->detect done!\n");
 	if (returnvalue < 0)
 		return returnvalue;
@@ -497,7 +507,7 @@ float solve_distance(vector<float> object1, vector<float> object2)//vector[0]´æ·
 }
 
 //changed by holobo
-int reflection_from_vector(vector<float>& bb, std::vector<vector<float> > detection_result, const char *output_txt)
+int reflection_from_vector(vector<float>& bb, std::vector<vector<float> > detection_result, int HEIGHT, const char *output_txt)
 {
 	std::vector<vector<float> > original_img_centers;
 	std::vector<vector<float> > object_centers;
@@ -644,12 +654,12 @@ void stringTOnum1(string s, vector<float>& pdata)
 //2:reflection results are lower than 10: That stands for the ineffciency of human part.
 __declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const char *input_result_txt, bool rotate, int &privacy_x, int &privacy_y, const char *output_txt)
 {
-
+	int HEIGHT = detector_front_refl.get_height();
 	std::streambuf* buf = std::cout.rdbuf();
 	std::ostream out(buf);
 	cv::Mat img(HEIGHT, WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
 	int returnvalue = 0;
-	returnvalue = txt_to_image(input_img_txt, img, rotate);
+	returnvalue = txt_to_image(input_img_txt, img, rotate, HEIGHT);
 	if (returnvalue < 0)
 		return returnvalue;
 	CHECK(!img.empty()) << "Unable to decode image " << input_img_txt;
@@ -675,7 +685,7 @@ __declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const
 	{
 		std::streambuf* buf = std::cout.rdbuf();
 		std::ostream out(buf);
-		int flag = 0;
+		int flag = -1;
 		FILE *f = NULL;
 		f = fopen(output_txt, "w");
 		if (f == NULL)
@@ -683,7 +693,7 @@ __declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const
 			printf("cannot open or create file %s ! \n", output_txt);
 			return -1;
 		}
-		fprintf(f, "%d\n", flag);  //Èç¹ûÃ»ÓÐ¼ì²âµ½ÈËÌå£¬¾ÍÐ´Ò»¸öÄÚÈÝÎª0µÄÎÄ¼þ
+		fprintf(f, "%d\n", flag);  //Èç¹ûÃ»ÓÐ¼ì²âµ½ÈËÌå£¬¾ÍÐ´Ò»¸öÄÚÈÝÎª-1µÄÎÄ¼þ
 		fclose(f);
 
 		//return the coordinate of top body part which is helpful for protecting the privacy.
@@ -755,7 +765,7 @@ __declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const
 	privacy_x = int(d_privacy[3] * WIDTH) + int(w / 2);
 	privacy_y = int(d_privacy[4] * HEIGHT);
 
-	int refl_result = reflection_from_vector(pdata, detections_refl_rectify, output_txt);
+	int refl_result = reflection_from_vector(pdata, detections_refl_rectify, HEIGHT, output_txt);
 	//int iou = calcIOU(10, 20, 10, 10, 10, 20, 5, 5);
 	
 	printf("-->Reflection detect done!\n");
@@ -764,11 +774,12 @@ __declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const
 
 __declspec(dllexport) int detect_txt_back_refl(const char *input_img_txt, const char *input_result_txt, bool rotate, int &privacy_x, int &privacy_y, const char *output_txt)
 {
+	int HEIGHT = detector_back_refl.get_height();
 	std::streambuf* buf = std::cout.rdbuf();
 	std::ostream out(buf);
 	cv::Mat img(HEIGHT, WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
 	int returnvalue = 0;
-	returnvalue = txt_to_image(input_img_txt, img, rotate);
+	returnvalue = txt_to_image(input_img_txt, img, rotate, HEIGHT);
 	if (returnvalue < 0)
 		return returnvalue;
 	CHECK(!img.empty()) << "Unable to decode image " << input_img_txt;
@@ -792,7 +803,7 @@ __declspec(dllexport) int detect_txt_back_refl(const char *input_img_txt, const 
 	{
 		std::streambuf* buf = std::cout.rdbuf();
 		std::ostream out(buf);
-		int flag = 0;
+		int flag = -1;
 		FILE *f = NULL;
 		f = fopen(output_txt, "w");
 		if (f == NULL)
@@ -872,7 +883,7 @@ __declspec(dllexport) int detect_txt_back_refl(const char *input_img_txt, const 
 	privacy_x = int(d_privacy[3] * WIDTH) + int(w / 2);
 	privacy_y = int(d_privacy[4] * HEIGHT);
 
-	int refl_result = reflection_from_vector(pdata, detections_refl_rectify, output_txt);
+	int refl_result = reflection_from_vector(pdata, detections_refl_rectify, HEIGHT, output_txt);
 	//int iou = calcIOU(10, 20, 10, 10, 10, 20, 5, 5);
 
 	printf("-->Reflection detect done!\n");
@@ -887,7 +898,7 @@ __declspec(dllexport) int detect_txt_back_refl(const char *input_img_txt, const 
 //3£¬Ó³ÉäµÄ¿¨Í¨Í¼µÄ´óÐ¡ÊÇ380*800£¬²¢ÇÒÊÇman_f_new.pngÕâÕÅÍ¼£¬ÒòÎªÖÐÐÄµãÒÑ¾­Ð´ËÀÔÚ³ÌÐòÖÐ¡£
 //4£¬Ó³Éä¼ì²âÈËÌåµÄÊ±ºòÐèÒª½«threÉèÖÃ0.95ÉõÖÁ¿ÉÒÔ¸ü¸ß£¬ÒòÎªÈôÌ«µÍ¿ÉÄÜµ¼ÖÂ¼ì²âµ½µÄobjectÊýÁ¿´óÓÚ10¸ö£¬½øÈëµ½·µ»ØÖµÎª2µÄÇé¿ö¡£
 
-
+/*
 int main() {
 
 
@@ -897,8 +908,8 @@ int main() {
   const char * model_file_refl = "D:\\CODE\\ssd_models\\models\\VGGNet\\VOC0712Plus\\deploy_refl.prototxt";
   const char * weights_file_refl = "D:\\CODE\\ssd_models\\models\\VGGNet\\VOC0712Plus\\SSD_Reflection.caffemodel";
   
-  detect_init_front(model_file, weights_file, 0, 380, 300, 300, 0.4);
-  detect_init_back(model_file, weights_file, 0, 380, 300, 300, 0.4);
+  detect_init_front(model_file, weights_file, 0, 400, 300, 300, 0.4);
+  detect_init_back(model_file, weights_file, 0, 400, 300, 300, 0.4);
 
   long t1 = GetTickCount();
   detect_txt_front("D:/CODE/ssd_models/3image_finish1_b.txt", 1, "D:/CODE/ssd_models/result.txt", 0);
@@ -924,5 +935,6 @@ int main() {
   std::cout << "privacy_x£º" << privacy_x << std::endl;
   return 0;
 }
+*/
 
 #endif  // USE_OPENCV

@@ -41,4 +41,3 @@ Requriements: CUDA8.0 and cudnn v5.x or  cudnn v6.x (NOTE: inappropriate cudnn v
 
 ### Questions
 
-Holobo: 515765944@qq.com  

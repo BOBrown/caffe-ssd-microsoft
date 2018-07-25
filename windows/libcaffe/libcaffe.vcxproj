@@ -36,7 +36,7 @@
     <Import Project="$(SolutionDir)\CommonSettings.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros">
-    <NuGetPackageImportStamp>0c91d16f</NuGetPackageImportStamp>
+    <NuGetPackageImportStamp>6e9c097a</NuGetPackageImportStamp>
   </PropertyGroup>
   <ImportGroup Label="ExtensionSettings" Condition="'$(CpuOnlyBuild)'=='false'">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA $(CudaVersion).props" />
