@@ -261,7 +261,7 @@ DEFINE_string(file_type, "image",
     "The file type in the list_file. Currently support image and video.");
 DEFINE_string(out_file, "",
     "If provided, store the detection results in the out_file.");
-DEFINE_double(confidence_threshold, 0.9,
+DEFINE_double(confidence_threshold, 0.96,
     "Only store detections with score higher than the threshold.");
 
 
@@ -273,8 +273,8 @@ extern "C"_declspec(dllexport) void detect_init_front_refl(const char *network_p
 extern "C"_declspec(dllexport) void detect_init_back_refl(const char *network_pt, const char *caffemodel, int GPUID, int h, int max_in, int min_in, float thresh);
 extern "C"_declspec(dllexport) void detect_init_back(const char *caffemodel, const char *network_pt, int GPUID, int h, int max_in, int min_in, float thresh);
 extern "C"_declspec(dllexport) int detect_txt_back(const char *input_txt, bool rotate, const char *output_txt, bool vis);
-extern "C"_declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const char *input_result_txt, bool rotate, int &privacy_x, int &privacy_y, const char *output_txt);
-extern "C"_declspec(dllexport) int detect_txt_back_refl(const char *input_img_txt, const char *input_result_txt, bool rotate, int &privacy_x, int &privacy_y, const char *output_txt);
+extern "C"_declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const char *input_result_txt, bool rotate, int &privacy_x, int &privacy_y, const char *output_txt, int visualization);
+extern "C"_declspec(dllexport) int detect_txt_back_refl(const char *input_img_txt, const char *input_result_txt, bool rotate, int &privacy_x, int &privacy_y, const char *output_txt, int visualization);
 
 Detector detector_front, detector_back, detector_front_refl, detector_back_refl;
 float confidence_threshold_front, confidence_threshold_back, confidence_threshold_front_refl, confidence_threshold_back_relf;
@@ -354,7 +354,7 @@ int txt_to_image(const char *txt_file_name, cv::Mat image, bool rotate, int Heig
 
 
 /*you may change the class Detection to the type of SSD*/
-int write_to_txt(const char *output_path, std::vector<vector<float> > detections, int pro_flag, float thre, int HEIGHT)
+int write_to_txt(const char *output_path, std::vector<vector<float> > detections, int pro_flag, float thre, int height)
 {
 	std::streambuf* buf = std::cout.rdbuf();
 	std::ostream out(buf);
@@ -376,15 +376,15 @@ int write_to_txt(const char *output_path, std::vector<vector<float> > detections
 		if (score >= thre)
 		{
 			int w = float(d[5] * WIDTH) - float(d[3] * WIDTH);
-			int h = float(d[6] * HEIGHT) - float(d[4] * HEIGHT);
+			int h = float(d[6] * height) - float(d[4] * height);
 			out << static_cast<int>(d[1]) << " ";
 			out << score << " ";
 			out << static_cast<int>(d[3] * WIDTH) << " ";
-			out << static_cast<int>(d[4] * HEIGHT) << " ";
+			out << static_cast<int>(d[4] * height) << " ";
 			out << w << " ";
 			out << h << std::endl;
 			
-			fprintf(f, "%d %d %d %d %f %d\n", int(d[3] * WIDTH), int(d[4] * HEIGHT), w, h, score, int(d[1]));
+			fprintf(f, "%d %d %d %d %f %d\n", int(d[3] * WIDTH), int(d[4] * height), w, h, score, int(d[1]));
 		}
 		
 	}
@@ -431,51 +431,12 @@ __declspec(dllexport) void detect_init_back_refl(const char *network_pt, const c
 __declspec(dllexport) int detect_txt_front(const char *input_txt, bool rotate, const char *output_txt, bool vis)
 {
 	int pro_flag = 0;
-	int HEIGHT = detector_front.get_height();
-
+	int height = detector_back.get_height();
 	std::streambuf* buf = std::cout.rdbuf();
 	std::ostream out(buf);
-	cv::Mat img(HEIGHT, WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
+	cv::Mat img(height, WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
 	int returnvalue = 0;
-	returnvalue = txt_to_image(input_txt, img, rotate, HEIGHT);
-	if (returnvalue < 0)
-		return returnvalue;
-	CHECK(!img.empty()) << "Unable to decode image " << input_txt;
-	//cv::imshow("Result", img);
-	//cv::imwrite("D:\\test_390.png", img);
-	//cv::waitKey(0);
-
-	
-	std::vector<vector<float> > detections = detector_front.Detect(img);
-
-
-	for (int i = 0; i < detections.size(); ++i) {
-		const vector<float>& d = detections[i];
-		// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
-		CHECK_EQ(d.size(), 7);
-		const float score = d[2];
-		if (score >= confidence_threshold_front) {
-			pro_flag++;
-		}
-	}
-	//changed by holobo
-	write_to_txt(output_txt, detections, pro_flag, confidence_threshold_front, HEIGHT);
-	printf("-->detect done!\n");
-	if (returnvalue < 0)
-		return returnvalue;
-	return 1;
-}
-
-//changed by holobo
-__declspec(dllexport) int detect_txt_back(const char *input_txt, bool rotate, const char *output_txt, bool vis)
-{
-	int pro_flag = 0;
-	int HEIGHT = detector_back.get_height();
-	std::streambuf* buf = std::cout.rdbuf();
-	std::ostream out(buf);
-	cv::Mat img(HEIGHT, WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
-	int returnvalue = 0;
-	returnvalue = txt_to_image(input_txt, img, rotate, HEIGHT);
+	returnvalue = txt_to_image(input_txt, img, rotate, height);
 	if (returnvalue < 0)
 		return returnvalue;
 	CHECK(!img.empty()) << "Unable to decode image " << input_txt;
@@ -493,7 +454,41 @@ __declspec(dllexport) int detect_txt_back(const char *input_txt, bool rotate, co
 		}
 	}
 	//changed by holobo
-	write_to_txt(output_txt, detections, pro_flag, confidence_threshold_back, HEIGHT);
+	write_to_txt(output_txt, detections, pro_flag, confidence_threshold_back, height);
+	printf("-->detect done!\n");
+	if (returnvalue < 0)
+		return returnvalue;
+	return 1;
+}
+
+//changed by holobo
+__declspec(dllexport) int detect_txt_back(const char *input_txt, bool rotate, const char *output_txt, bool vis)
+{
+	int pro_flag = 0;
+	int height = detector_back.get_height();
+	std::streambuf* buf = std::cout.rdbuf();
+	std::ostream out(buf);
+	cv::Mat img(height, WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
+	int returnvalue = 0;
+	returnvalue = txt_to_image(input_txt, img, rotate, height);
+	if (returnvalue < 0)
+		return returnvalue;
+	CHECK(!img.empty()) << "Unable to decode image " << input_txt;
+	//cv::imshow("Result", img);
+	//cv::waitKey(0);
+	std::vector<vector<float> > detections = detector_back.Detect(img);
+
+	for (int i = 0; i < detections.size(); ++i) {
+		const vector<float>& d = detections[i];
+		// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
+		CHECK_EQ(d.size(), 7);
+		const float score = d[2];
+		if (score >= confidence_threshold_back) {
+			pro_flag++;
+		}
+	}
+	//changed by holobo
+	write_to_txt(output_txt, detections, pro_flag, confidence_threshold_back, height);
 	printf("-->detect done!\n");
 	if (returnvalue < 0)
 		return returnvalue;
@@ -513,7 +508,8 @@ int reflection_from_vector(vector<float>& bb, std::vector<vector<float> > detect
 	std::vector<vector<float> > object_centers;
 
 	//初始化中心点坐标,按顺序分别是人体的十个区域
-	int reflection_center[20] = { 55, 119, 327, 119, 60, 198, 314, 204, 168, 281, 189, 445, 139, 555, 236, 555, 138, 703, 237, 703 };//数组中存放10个中心点坐标，这里写死在程序中，或采用读取txt的形式获得
+	//old version:int reflection_center[20] = { 55, 119, 327, 119, 60, 198, 314, 204, 168, 281, 189, 445, 139, 555, 236, 555, 138, 703, 237, 703 };//数组中存放10个中心点坐标，这里写死在程序中，或采用读取txt的形式获得
+	int reflection_center[20] = { 56, 97, 318, 97, 63, 190, 322, 190, 190, 310, 190, 469, 139, 546, 231, 546, 139, 690, 234, 690 };
 	std::vector<vector<float> > reflection_centers;
 	for (int i = 0; i < 10; ++i) {
 		vector<float> ref_center;
@@ -572,8 +568,8 @@ int reflection_from_vector(vector<float>& bb, std::vector<vector<float> > detect
 		//映射，给定object的在原始图片的全部信息和area_id，输出output_txt，即在映射图上的坐标信息
 		//求出映射后bb的w h，左上角坐标
 		//object in ori_img关于center的偏移
-		int ori_minx = bb[0 + VECTOR_TXT * i];
-		int ori_miny = bb[1 + VECTOR_TXT * i];
+		int ori_minx = object_center[0];
+		int ori_miny = object_center[1];
 		float bias_x = (ori_minx - original_img_centers[area_id][0])/WIDTH;
 		float bias_y = (ori_miny - original_img_centers[area_id][1])/HEIGHT;
 		float ori_w = bb[2 + VECTOR_TXT * i] / WIDTH;
@@ -582,6 +578,89 @@ int reflection_from_vector(vector<float>& bb, std::vector<vector<float> > detect
 		//reflection的10个中心点坐标
 		float ref_center_x = reflection_centers[area_id][0] / REFLECTION_WIDTH;
 		float ref_center_y = reflection_centers[area_id][1] / REFLECTION_HEIGHT;
+		float ref_x = (ref_center_x + bias_x) * REFLECTION_WIDTH;
+		float ref_y = (ref_center_y + bias_y) * REFLECTION_HEIGHT;
+		float ref_w = ori_w * REFLECTION_WIDTH;
+		float ref_h = ori_h * REFLECTION_HEIGHT;
+
+		//写入txt
+		if (f == NULL)
+		{
+			printf("cannot open or create file %s ! \n", output_txt);
+			return -1;
+		}
+
+		float num = float(bb[4 + VECTOR_TXT * i]);
+		fprintf(f, "%d %d %d %d %f %d\n", int(ref_x), int(ref_y), int(ref_w), int(ref_h), num, int(bb[5 + VECTOR_TXT * i]));
+	}
+	fclose(f);
+	return 1;
+}
+
+//changed by holobo
+int less_part_reflection_from_vector(vector<float>& bb, const vector<float> detection_result, int HEIGHT, const char *output_txt)
+{
+	std::vector<vector<float> > original_img_centers;
+	std::vector<vector<float> > object_centers;
+
+	//初始化中心点坐标,这里只以人体中心点为参考系
+	int reflection_center[2] = {168, 281};//数组中存放人体中心点坐标
+	std::vector<vector<float> > reflection_centers;
+	for (int i = 0; i < 1; ++i) {
+		vector<float> ref_center;
+		int center_x = reflection_center[0 + 2 * i];
+		int center_y = reflection_center[1 + 2 * i];
+		ref_center.push_back(center_x);
+		ref_center.push_back(center_y);
+		reflection_centers.push_back(ref_center);
+		ref_center.clear();
+	}
+	//计算detection_result的中心点坐标
+	const vector<float>& d = detection_result;
+	int w = int(d[5] * WIDTH) - int(d[3] * WIDTH);
+	int h = int(d[6] * HEIGHT) - int(d[4] * HEIGHT);
+	int center_x = int(d[3] * WIDTH) + int(w / 2);
+	int center_y = int(d[4] * HEIGHT) + int(h / 2);
+	vector<float> img_center;
+	img_center.push_back(center_x);
+	img_center.push_back(center_y);
+	original_img_centers.push_back(img_center);
+	img_center.clear();
+	
+	//计算vector bb的中心点坐标，若存在多个object，计算对应数量的中心点
+	for (int i = 0; i < int(bb.size() / VECTOR_TXT); ++i) {
+		int w = bb[2 + VECTOR_TXT*i];
+		int h = bb[3 + VECTOR_TXT*i];
+		int center_x = int(bb[0 + VECTOR_TXT*i]) + int(w / 2);
+		int center_y = int(bb[1 + VECTOR_TXT*i]) + int(h / 2);
+		vector<float> object_center;
+		object_center.push_back(center_x);
+		object_center.push_back(center_y);
+		object_centers.push_back(object_center);
+		object_center.clear();
+	}
+	//object的中心点，在detection_result的中心点中找一个最近的，之后调用映射函数,把坐标写入txt
+	std::streambuf* buf = std::cout.rdbuf();
+	std::ostream out(buf);
+	FILE *f = NULL;
+	f = fopen(output_txt, "w");
+	fprintf(f, "%d\n", object_centers.size());
+	for (int i = 0; i < object_centers.size(); ++i) {
+		const vector<float>& object_center = object_centers[i];
+		
+		//映射，给定object的在原始图片的全部信息和area_id，输出output_txt，即在映射图上的坐标信息
+		//求出映射后bb的w h，左上角坐标
+		//object in ori_img关于center的偏移
+		int ori_minx = object_center[0];
+		int ori_miny = object_center[1];
+		float bias_x = (ori_minx - original_img_centers[0][0]) / WIDTH;
+		float bias_y = (ori_miny - original_img_centers[0][1]) / HEIGHT;
+		float ori_w = bb[2 + VECTOR_TXT * i] / WIDTH;
+		float ori_h = bb[3 + VECTOR_TXT * i] / HEIGHT;
+
+		//reflection的10个中心点坐标
+		float ref_center_x = reflection_centers[0][0] / REFLECTION_WIDTH;
+		float ref_center_y = reflection_centers[0][1] / REFLECTION_HEIGHT;
 		float ref_x = (ref_center_x + bias_x) * REFLECTION_WIDTH;
 		float ref_y = (ref_center_y + bias_y) * REFLECTION_HEIGHT;
 		float ref_w = ori_w * REFLECTION_WIDTH;
@@ -652,212 +731,21 @@ void stringTOnum1(string s, vector<float>& pdata)
 //The return value is lower than 0:fail in txt2img
 //1:success in reflection
 //2:reflection results are lower than 10: That stands for the ineffciency of human part.
-__declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const char *input_result_txt, bool rotate, int &privacy_x, int &privacy_y, const char *output_txt)
+__declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const char *input_result_txt, bool rotate, int &privacy_x, int &privacy_y, const char *output_txt, int visualizaton)
 {
-	int HEIGHT = detector_front_refl.get_height();
+	int height = detector_back_refl.get_height();
 	std::streambuf* buf = std::cout.rdbuf();
 	std::ostream out(buf);
-	cv::Mat img(HEIGHT, WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
+	cv::Mat img(height, WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
 	int returnvalue = 0;
-	returnvalue = txt_to_image(input_img_txt, img, rotate, HEIGHT);
+	returnvalue = txt_to_image(input_img_txt, img, rotate, height);
 	if (returnvalue < 0)
 		return returnvalue;
 	CHECK(!img.empty()) << "Unable to decode image " << input_img_txt;
-	//cv::imshow("Result", img);
-	//cv::waitKey(0);
-	std::vector<vector<float> > detections = detector_front_refl.Detect(img);
-	std::vector<vector<float> > detections_refl;
-	std::vector<vector<float> > detections_refl_rectify;
-
-	//write_to_txt(output_txt, detections, pro_flag, confidence_threshold_front_refl);
-
-	for (int i = 0; i < detections.size(); ++i) {
-		const vector<float>& d = detections[i];
-		// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
-		CHECK_EQ(d.size(), 7);
-		const float score = d[2];
-		if (score >= confidence_threshold_front_refl) {
-			detections_refl.push_back(d);
-		}
-	}
-
-	if (detections_refl.size() != 10) //当对原始图片检测时，身体部位的个数不等于10个，需要进行对称变化，或者是添加默认框，使size==10
+	if (visualizaton)
 	{
-		std::streambuf* buf = std::cout.rdbuf();
-		std::ostream out(buf);
-		int flag = -1;
-		FILE *f = NULL;
-		f = fopen(output_txt, "w");
-		if (f == NULL)
-		{
-			printf("cannot open or create file %s ! \n", output_txt);
-			return -1;
-		}
-		fprintf(f, "%d\n", flag);  //如果没有检测到人体，就写一个内容为-1的文件
-		fclose(f);
-
-		//return the coordinate of top body part which is helpful for protecting the privacy.
-		//if detections_refl.size() != 10, then we can not confirm which index is the human body part. Therefore, we employ the search method to pick up the human body.
-		int flag_privacy = 0;
-		for (int i = 0; i < detections_refl.size(); ++i) {
-			const vector<float>& d = detections_refl[i];
-			if (d[1] == 3)//d[1] stores the id information.
-			{
-				int w = int(d[5] * WIDTH) - int(d[3] * WIDTH);
-				privacy_x = int(d[3] * WIDTH) + int(w / 2);
-				privacy_y = int(d[4] * HEIGHT);
-				flag_privacy = 1;
-				break;
-			}
-			if (((i + 1) == detections_refl.size()) && flag_privacy == 0)
-			{
-				privacy_x = 96;
-				privacy_y = 96;
-			}
-		}
-		return 2;
-	}
-
-	//矫正在detections中存储的元素，按照每一类的xmin从小到大排序
-	for (int i = 0; i < 5; ++i) {
-		const vector<float>& d = detections_refl[2 * i];
-		const vector<float>& d_next = detections_refl[2 * i + 1];
-		if (i == 2)
-		{
-			detections_refl_rectify.push_back(d);
-			detections_refl_rectify.push_back(d_next);
-			continue;
-		}
-		// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
-		CHECK_EQ(d.size(), 7);
-		CHECK_EQ(d_next.size(), 7);
-		if (d_next[3] > d[3]) {
-			//交换d和d_next
-			detections_refl_rectify.push_back(d);
-			detections_refl_rectify.push_back(d_next);
-		}
-		else{
-			detections_refl_rectify.push_back(d_next);
-			detections_refl_rectify.push_back(d);
-		}
-	}
-
-	//read txt object file
-	std::ifstream infile;
-	infile.open(string(input_result_txt).data());
-	assert(infile.is_open());
-	string s;
-	vector<float> pdata;
-	while (getline(infile, s))
-	{
-		if (s.length() > 1)
-		{
-			stringTOnum1(s, pdata);
-		}	
-	}
-	infile.close();
-	//std::cout << "text:" << std::endl;
-	//for (int i = 0; i < pdata.size(); i++)
-		//std::cout << pdata[i] << " ";
-	//return the coordinate of top body part which is helpful for protecting the privacy.
-	const vector<float>& d_privacy = detections_refl_rectify[4];
-	int w = int(d_privacy[5] * WIDTH) - int(d_privacy[3] * WIDTH);
-	privacy_x = int(d_privacy[3] * WIDTH) + int(w / 2);
-	privacy_y = int(d_privacy[4] * HEIGHT);
-
-	int refl_result = reflection_from_vector(pdata, detections_refl_rectify, HEIGHT, output_txt);
-	//int iou = calcIOU(10, 20, 10, 10, 10, 20, 5, 5);
-	
-	printf("-->Reflection detect done!\n");
-	return refl_result;
-}
-
-__declspec(dllexport) int detect_txt_back_refl(const char *input_img_txt, const char *input_result_txt, bool rotate, int &privacy_x, int &privacy_y, const char *output_txt)
-{
-	int HEIGHT = detector_back_refl.get_height();
-	std::streambuf* buf = std::cout.rdbuf();
-	std::ostream out(buf);
-	cv::Mat img(HEIGHT, WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
-	int returnvalue = 0;
-	returnvalue = txt_to_image(input_img_txt, img, rotate, HEIGHT);
-	if (returnvalue < 0)
-		return returnvalue;
-	CHECK(!img.empty()) << "Unable to decode image " << input_img_txt;
-	//cv::imshow("Result", img);
-	//cv::waitKey(0);
-	std::vector<vector<float> > detections = detector_back_refl.Detect(img);
-	std::vector<vector<float> > detections_refl;
-	std::vector<vector<float> > detections_refl_rectify;
-
-	for (int i = 0; i < detections.size(); ++i) {
-		const vector<float>& d = detections[i];
-		// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
-		CHECK_EQ(d.size(), 7);
-		const float score = d[2];
-		if (score >= confidence_threshold_front_refl) {
-			detections_refl.push_back(d);
-		}
-	}
-
-	if (detections_refl.size() != 10) //当对原始图片检测时，身体部位的个数不等于10个，需要进行对称变化，或者是添加默认框，使size==10
-	{
-		std::streambuf* buf = std::cout.rdbuf();
-		std::ostream out(buf);
-		int flag = -1;
-		FILE *f = NULL;
-		f = fopen(output_txt, "w");
-		if (f == NULL)
-		{
-			printf("cannot open or create file %s ! \n", output_txt);
-			return -1;
-		}
-		fprintf(f, "%d\n", flag);  //如果没有检测到人体，就写一个内容为0的文件
-		fclose(f);
-
-		//return the coordinate of top body part which is helpful for protecting the privacy.
-		//if detections_refl.size() != 10, then we can not confirm which index is the human body part. Therefore, we employ the search method to pick up the human body.
-		int flag_privacy = 0;
-		for (int i = 0; i < detections_refl.size(); ++i) {
-			const vector<float>& d = detections_refl[i];
-			if (d[1] == 3)//d[1] stores the id information.
-			{
-				int w = int(d[5] * WIDTH) - int(d[3] * WIDTH);
-				privacy_x = int(d[3] * WIDTH) + int(w / 2);
-				privacy_y = int(d[4] * HEIGHT);
-				flag_privacy = 1;
-				break;
-			}
-			if (((i + 1) == detections_refl.size()) && flag_privacy == 0)
-			{
-				privacy_x = 96;
-				privacy_y = 96;
-			}
-		}
-		return 2;
-	}
-
-	//矫正在detections中存储的元素，按照每一类的xmin从小到大排序
-	for (int i = 0; i < 5; ++i) {
-		const vector<float>& d = detections_refl[2 * i];
-		const vector<float>& d_next = detections_refl[2 * i + 1];
-		if (i == 2)
-		{
-			detections_refl_rectify.push_back(d);
-			detections_refl_rectify.push_back(d_next);
-			continue;
-		}
-		// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
-		CHECK_EQ(d.size(), 7);
-		CHECK_EQ(d_next.size(), 7);
-		if (d_next[3] > d[3]) {
-			//交换d和d_next
-			detections_refl_rectify.push_back(d);
-			detections_refl_rectify.push_back(d_next);
-		}
-		else{
-			detections_refl_rectify.push_back(d_next);
-			detections_refl_rectify.push_back(d);
-		}
+		cv::imshow("Result", img);
+		cv::waitKey(0);
 	}
 
 	//read txt object file
@@ -877,13 +765,240 @@ __declspec(dllexport) int detect_txt_back_refl(const char *input_img_txt, const 
 	//std::cout << "text:" << std::endl;
 	//for (int i = 0; i < pdata.size(); i++)
 	//std::cout << pdata[i] << " ";
+
+	std::vector<vector<float> > detections = detector_back_refl.Detect(img);
+	std::vector<vector<float> > detections_refl;
+	std::vector<vector<float> > detections_refl_rectify;
+
+	for (int i = 0; i < detections.size(); ++i) {
+		const vector<float>& d = detections[i];
+		// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
+		CHECK_EQ(d.size(), 7);
+		const float score = d[2];
+		if (score >= confidence_threshold_front_refl) {
+			detections_refl.push_back(d);
+		}
+	}
+
+	if (detections_refl.size() != 10) //当对原始图片检测时，身体部位的个数不等于10个，需要进行对称变化，或者是添加默认框，使size==10
+	{
+		int refl_result = 0;
+		/*std::streambuf* buf = std::cout.rdbuf();
+		std::ostream out(buf);
+		int flag = -1;
+		FILE *f = NULL;
+		f = fopen(output_txt, "w");
+		if (f == NULL)
+		{
+		printf("cannot open or create file %s ! \n", output_txt);
+		return -1;
+		}
+		fprintf(f, "%d\n", flag);  //如果没有检测到人体，就写一个内容为-1的文件
+		fclose(f);*/
+
+		//return the coordinate of top body part which is helpful for protecting the privacy.
+		//if detections_refl.size() != 10, then we can not confirm which index is the human body part. Therefore, we employ the search method to pick up the human body.
+		int is_finding = 0;
+		for (int i = 0; i < detections_refl.size(); ++i) {
+			const vector<float>& d = detections_refl[i];
+			if (d[1] == 3)//d[1] stores the id information.
+			{
+				//version 2: if the size of detection results is not equal to 10, then the id3 part of human is the reference for reflecting the coordinate.
+				refl_result = less_part_reflection_from_vector(pdata, d, height, output_txt);
+
+				int w = int(d[5] * WIDTH) - int(d[3] * WIDTH);
+				privacy_x = int(d[3] * WIDTH) + int(w / 2);
+				privacy_y = int(d[4] * height);
+				is_finding = 1;
+				break;
+			}
+		}
+		//id3 part of human is not found 
+		if (is_finding == 0)
+		{
+			vector<float> d;
+			d.push_back(0);
+			d.push_back(3);
+			d.push_back(0.999151826);
+			d.push_back(0.330279380);
+			d.push_back(0.252663732);
+			d.push_back(0.626723886);
+			d.push_back(0.515658498);
+			refl_result = less_part_reflection_from_vector(pdata, d, height, output_txt);
+			privacy_x = 96;
+			privacy_y = 105;
+		}
+		return refl_result;
+	}
+
+	//矫正在detections中存储的元素，按照每一类的xmin从小到大排序
+	for (int i = 0; i < 5; ++i) {
+		const vector<float>& d = detections_refl[2 * i];
+		const vector<float>& d_next = detections_refl[2 * i + 1];
+		if (i == 2)
+		{
+			detections_refl_rectify.push_back(d);
+			detections_refl_rectify.push_back(d_next);
+			continue;
+		}
+		// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
+		CHECK_EQ(d.size(), 7);
+		CHECK_EQ(d_next.size(), 7);
+		if (d_next[3] > d[3]) {
+			//交换d和d_next
+			detections_refl_rectify.push_back(d);
+			detections_refl_rectify.push_back(d_next);
+		}
+		else{
+			detections_refl_rectify.push_back(d_next);
+			detections_refl_rectify.push_back(d);
+		}
+	}
+
 	//return the coordinate of top body part which is helpful for protecting the privacy.
 	const vector<float>& d_privacy = detections_refl_rectify[4];
 	int w = int(d_privacy[5] * WIDTH) - int(d_privacy[3] * WIDTH);
 	privacy_x = int(d_privacy[3] * WIDTH) + int(w / 2);
-	privacy_y = int(d_privacy[4] * HEIGHT);
+	privacy_y = int(d_privacy[4] * height);
 
-	int refl_result = reflection_from_vector(pdata, detections_refl_rectify, HEIGHT, output_txt);
+	int refl_result = reflection_from_vector(pdata, detections_refl_rectify, height, output_txt);
+	//int iou = calcIOU(10, 20, 10, 10, 10, 20, 5, 5);
+
+	printf("-->Reflection detect done!\n");
+	return refl_result;
+}
+
+__declspec(dllexport) int detect_txt_back_refl(const char *input_img_txt, const char *input_result_txt, bool rotate, int &privacy_x, int &privacy_y, const char *output_txt, int visualizaton)
+{
+	int height = detector_back_refl.get_height();
+	std::streambuf* buf = std::cout.rdbuf();
+	std::ostream out(buf);
+	cv::Mat img(height, WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
+	int returnvalue = 0;
+	returnvalue = txt_to_image(input_img_txt, img, rotate, height);
+	if (returnvalue < 0)
+		return returnvalue;
+	CHECK(!img.empty()) << "Unable to decode image " << input_img_txt;
+	if (visualizaton)
+	{
+		cv::imshow("Result", img);
+		cv::waitKey(0);
+	}
+
+	//read txt object file
+	std::ifstream infile;
+	infile.open(string(input_result_txt).data());
+	assert(infile.is_open());
+	string s;
+	vector<float> pdata;
+	while (getline(infile, s))
+	{
+		if (s.length() > 1)
+		{
+			stringTOnum1(s, pdata);
+		}
+	}
+	infile.close();
+	//std::cout << "text:" << std::endl;
+	//for (int i = 0; i < pdata.size(); i++)
+	//std::cout << pdata[i] << " ";
+
+	std::vector<vector<float> > detections = detector_back_refl.Detect(img);
+	std::vector<vector<float> > detections_refl;
+	std::vector<vector<float> > detections_refl_rectify;
+
+	for (int i = 0; i < detections.size(); ++i) {
+		const vector<float>& d = detections[i];
+		// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
+		CHECK_EQ(d.size(), 7);
+		const float score = d[2];
+		if (score >= confidence_threshold_front_refl) {
+			detections_refl.push_back(d);
+		}
+	}
+
+	if (detections_refl.size() != 10) //当对原始图片检测时，身体部位的个数不等于10个，需要进行对称变化，或者是添加默认框，使size==10
+	{
+		int refl_result = 0;
+		/*std::streambuf* buf = std::cout.rdbuf();
+		std::ostream out(buf);
+		int flag = -1;
+		FILE *f = NULL;
+		f = fopen(output_txt, "w");
+		if (f == NULL)
+		{
+		printf("cannot open or create file %s ! \n", output_txt);
+		return -1;
+		}
+		fprintf(f, "%d\n", flag);  //如果没有检测到人体，就写一个内容为-1的文件
+		fclose(f);*/
+
+		//return the coordinate of top body part which is helpful for protecting the privacy.
+		//if detections_refl.size() != 10, then we can not confirm which index is the human body part. Therefore, we employ the search method to pick up the human body.
+		int is_finding = 0;
+		for (int i = 0; i < detections_refl.size(); ++i) {
+			const vector<float>& d = detections_refl[i];
+			if (d[1] == 3)//d[1] stores the id information.
+			{
+				//version 2: if the size of detection results is not equal to 10, then the id3 part of human is the reference for reflecting the coordinate.
+				refl_result = less_part_reflection_from_vector(pdata, d, height, output_txt);
+
+				int w = int(d[5] * WIDTH) - int(d[3] * WIDTH);
+				privacy_x = int(d[3] * WIDTH) + int(w / 2);
+				privacy_y = int(d[4] * height);
+				is_finding = 1;
+				break;
+			}
+		}
+		//id3 part of human is not found 
+		if (is_finding == 0)
+		{
+			vector<float> d;
+			d.push_back(0);
+			d.push_back(3);
+			d.push_back(0.999151826);
+			d.push_back(0.330279380);
+			d.push_back(0.252663732);
+			d.push_back(0.626723886);
+			d.push_back(0.515658498);
+			refl_result = less_part_reflection_from_vector(pdata, d, height, output_txt);
+			privacy_x = 96;
+			privacy_y = 105;
+		}
+		return refl_result;
+	}
+
+	//矫正在detections中存储的元素，按照每一类的xmin从小到大排序
+	for (int i = 0; i < 5; ++i) {
+		const vector<float>& d = detections_refl[2 * i];
+		const vector<float>& d_next = detections_refl[2 * i + 1];
+		if (i == 2)
+		{
+			detections_refl_rectify.push_back(d);
+			detections_refl_rectify.push_back(d_next);
+			continue;
+		}
+		// Detection format: [image_id, label, score, xmin, ymin, xmax, ymax].
+		CHECK_EQ(d.size(), 7);
+		CHECK_EQ(d_next.size(), 7);
+		if (d_next[3] > d[3]) {
+			//交换d和d_next
+			detections_refl_rectify.push_back(d);
+			detections_refl_rectify.push_back(d_next);
+		}
+		else{
+			detections_refl_rectify.push_back(d_next);
+			detections_refl_rectify.push_back(d);
+		}
+	}
+
+	//return the coordinate of top body part which is helpful for protecting the privacy.
+	const vector<float>& d_privacy = detections_refl_rectify[4];
+	int w = int(d_privacy[5] * WIDTH) - int(d_privacy[3] * WIDTH);
+	privacy_x = int(d_privacy[3] * WIDTH) + int(w / 2);
+	privacy_y = int(d_privacy[4] * height);
+
+	int refl_result = reflection_from_vector(pdata, detections_refl_rectify, height, output_txt);
 	//int iou = calcIOU(10, 20, 10, 10, 10, 20, 5, 5);
 
 	printf("-->Reflection detect done!\n");
@@ -898,7 +1013,7 @@ __declspec(dllexport) int detect_txt_back_refl(const char *input_img_txt, const 
 //3，映射的卡通图的大小是380*800，并且是man_f_new.png这张图，因为中心点已经写死在程序中。
 //4，映射检测人体的时候需要将thre设置0.95甚至可以更高，因为若太低可能导致检测到的object数量大于10个，进入到返回值为2的情况。
 
-/*
+
 int main() {
 
 
@@ -908,33 +1023,38 @@ int main() {
   const char * model_file_refl = "D:\\CODE\\ssd_models\\models\\VGGNet\\VOC0712Plus\\deploy_refl.prototxt";
   const char * weights_file_refl = "D:\\CODE\\ssd_models\\models\\VGGNet\\VOC0712Plus\\SSD_Reflection.caffemodel";
   
+  const char * input_samples_front = "D:/CODE/ssd_models/image_finish1_b.txt";
+  const char * input_samples_back = "D:/CODE/ssd_models/image_finish_b.txt";
+
   detect_init_front(model_file, weights_file, 0, 400, 300, 300, 0.4);
   detect_init_back(model_file, weights_file, 0, 400, 300, 300, 0.4);
 
   long t1 = GetTickCount();
-  detect_txt_front("D:/CODE/ssd_models/3image_finish1_b.txt", 1, "D:/CODE/ssd_models/result.txt", 0);
+  detect_txt_front(input_samples_front, true, "D:/CODE/ssd_models/result.txt", 0);
   long t2 = GetTickCount();
   std::cout << "forward time：" << (t2 - t1) << std::endl;
-  detect_txt_back("D:/CODE/ssd_models/3image_finish1_b.txt", 0, "D:/CODE/ssd_models/result_back.txt", 0);
+  detect_txt_back(input_samples_back, false, "D:/CODE/ssd_models/result_back.txt", 0);
   
 
 
-  detect_init_front_refl(model_file_refl, weights_file_refl, 0, 380, 300, 300, 0.98);
-  detect_init_back_refl(model_file_refl, weights_file_refl, 0, 380, 300, 300, 0.98);
-
+  detect_init_front_refl(model_file_refl, weights_file_refl, 0, 400, 300, 300, 0.96);
+  detect_init_back_refl(model_file_refl, weights_file_refl, 0, 400, 300, 300, 0.96);
+  
   //注意：detect_txt_front_refl这个函数读取的object_txt文件的格式是[minx,miny,w,h,score,id]//不能缺少id信息
   int privacy_x;
   int privacy_y;
   long t3 = GetTickCount();
-  int a = detect_txt_front_refl("D:/CODE/ssd_models/3image_finish1_b.txt", "D:/CODE/ssd_models/result.txt", 1, privacy_x, privacy_y, "D:/CODE/ssd_models/result_refl.txt");
+  int a = detect_txt_front_refl(input_samples_front, "D:/CODE/ssd_models/result.txt", true, privacy_x, privacy_y, "D:/CODE/ssd_models/result_refl.txt", 1);
   long t4 = GetTickCount();
+  std::cout << "a result：" << a << std::endl;
   std::cout << "reflection forward time：" << (t4 - t3) << std::endl;
 
 
-  int b = detect_txt_back_refl("D:/CODE/ssd_models/3image_finish_b.txt", "D:/CODE/ssd_models/result_back.txt", 0, privacy_x, privacy_y,"D:/CODE/ssd_models/result_back_refl.txt");
+  int b = detect_txt_back_refl(input_samples_back, "D:/CODE/ssd_models/result_back.txt", false, privacy_x, privacy_y, "D:/CODE/ssd_models/result_back_refl.txt", 1);
+  std::cout << "b result：" << b << std::endl;
   std::cout << "privacy_x：" << privacy_x << std::endl;
   return 0;
 }
-*/
+
 
 #endif  // USE_OPENCV

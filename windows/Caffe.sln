@@ -90,8 +90,8 @@ Global
 		{A9ACEF83-7B63-4574-A554-89CE869EA141}.Debug|Mixed Platforms.ActiveCfg = Release|x64
 		{A9ACEF83-7B63-4574-A554-89CE869EA141}.Debug|Mixed Platforms.Build.0 = Release|x64
 		{A9ACEF83-7B63-4574-A554-89CE869EA141}.Debug|Win32.ActiveCfg = Release|x64
-		{A9ACEF83-7B63-4574-A554-89CE869EA141}.Debug|x64.ActiveCfg = Release|x64
-		{A9ACEF83-7B63-4574-A554-89CE869EA141}.Debug|x64.Build.0 = Release|x64
+		{A9ACEF83-7B63-4574-A554-89CE869EA141}.Debug|x64.ActiveCfg = Debug|x64
+		{A9ACEF83-7B63-4574-A554-89CE869EA141}.Debug|x64.Build.0 = Debug|x64
 		{A9ACEF83-7B63-4574-A554-89CE869EA141}.Release|Mixed Platforms.ActiveCfg = Release|x64
 		{A9ACEF83-7B63-4574-A554-89CE869EA141}.Release|Mixed Platforms.Build.0 = Release|x64
 		{A9ACEF83-7B63-4574-A554-89CE869EA141}.Release|Win32.ActiveCfg = Release|x64
