@@ -766,8 +766,8 @@ __declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const
 	//for (int i = 0; i < pdata.size(); i++)
 	//std::cout << pdata[i] << " ";
 
-	std::vector<vector<float> > detections = detector_back_refl.Detect(img);
-	std::vector<vector<float> > detections_refl;
+	std::vector<vector<float> > detections = detector_back_refl.Detect(img); //detections保存了检测的结果。
+	std::vector<vector<float> > detections_refl; //detections_refl保存了大于threshold的检测结果
 	std::vector<vector<float> > detections_refl_rectify;
 
 	for (int i = 0; i < detections.size(); ++i) {
@@ -798,6 +798,7 @@ __declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const
 
 		//return the coordinate of top body part which is helpful for protecting the privacy.
 		//if detections_refl.size() != 10, then we can not confirm which index is the human body part. Therefore, we employ the search method to pick up the human body.
+		//如果detections_refl不等于10，说明少于或者大于10个human part，因此，不可以直接映射，需要找到id=3的human part进行映射
 		int is_finding = 0;
 		for (int i = 0; i < detections_refl.size(); ++i) {
 			const vector<float>& d = detections_refl[i];
@@ -813,7 +814,8 @@ __declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const
 				break;
 			}
 		}
-		//id3 part of human is not found 
+		//id3 part of human is not found
+		//对于一个没有id3 human part的映射检测结果，需要赋值一些默认值进行坐标映射，以及默认值进行打马赛克。
 		if (is_finding == 0)
 		{
 			vector<float> d;
@@ -831,7 +833,7 @@ __declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const
 		return refl_result;
 	}
 
-	//矫正在detections中存储的元素，按照每一类的xmin从小到大排序
+	//如果detections_refl等于10，说明找到了10个human part。则，矫正在detections中存储的元素，按照每一类的xmin从小到大排序
 	for (int i = 0; i < 5; ++i) {
 		const vector<float>& d = detections_refl[2 * i];
 		const vector<float>& d_next = detections_refl[2 * i + 1];
@@ -854,6 +856,8 @@ __declspec(dllexport) int detect_txt_front_refl(const char *input_img_txt, const
 			detections_refl_rectify.push_back(d);
 		}
 	}
+
+	//detections_refl_rectify是按照坐标从小到大排列的一个vector
 
 	//return the coordinate of top body part which is helpful for protecting the privacy.
 	const vector<float>& d_privacy = detections_refl_rectify[4];
